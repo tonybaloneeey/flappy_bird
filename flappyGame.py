@@ -1,3 +1,5 @@
+import os
+
 import pygame
 from sys import exit
 import random
@@ -12,6 +14,7 @@ SCREEN_WIDTH = 551
 FLOOR_HEIGHT = 520
 GRAVITY = 0.5
 SCROLL_SPEED = 2
+gen = 0
 
 window = pygame.display.set_mode((SCREEN_WIDTH, SCREEN_HEIGHT))
 
@@ -71,6 +74,33 @@ class Bird(pygame.sprite.Sprite):
             self.vel = -7
 
 
+class aiBird(Bird):
+    def update(self, flap_action):
+        # Animate Bird
+        if self.alive:
+            self.image_index += 1
+        if self.image_index >= 30:
+            self.image_index = 0
+        self.image = bird_images[self.image_index // 10]
+
+        # Gravity and Flap
+        self.vel += GRAVITY
+        if self.vel > 7:
+            self.vel = 7
+        if self.rect.y < 500:
+            self.rect.y += int(self.vel)
+        if self.vel == 0:
+            self.flap = False
+
+        # Rotate Bird
+        self.image = pygame.transform.rotate(self.image, self.vel * -7)
+
+        # AI Input
+        if flap_action and not self.flap and self.rect.y > 0 and self.alive:
+            self.flap = True
+            self.vel = -7
+
+
 class Pipe(pygame.sprite.Sprite):
     def __init__(self, x, y, image, pipe_type, scroll_speed=1):
         pygame.sprite.Sprite.__init__(self)
@@ -88,8 +118,8 @@ class Pipe(pygame.sprite.Sprite):
     def get_y(self):
         return self.rect.y
 
-    def is_passed(self):
-        if self.passed:
+    def is_passed(self, x_pos):
+        if x_pos > self.rect.x:
             return True
         return False
 
@@ -190,9 +220,6 @@ def run_single_player_window():
         collision_pipes = pygame.sprite.spritecollide(bird.sprites()[0], pipes, False)
         collision_ground = pygame.sprite.spritecollide(bird.sprites()[0], ground, False)
 
-        print("COLLISION_PIPES", collision_pipes)
-        print("COLLISION_GROUND", collision_ground)
-
         if collision_pipes or collision_ground:
             bird.sprite.alive = False
             if collision_ground:
@@ -218,48 +245,35 @@ def run_single_player_window():
             pipes.remove(pipes.sprites()[0])
             pipes.remove(pipes.sprites()[0])
 
-        type(pipes.sprites()[0])
-        # print("PASSED")
-
-        pygame.draw.circle(window, (255, 0, 0), (pipes.sprites()[0].rect.x, pipes.sprites()[0].rect.y), 3)
-
-        # print(pipes.sprites().__len__())
-        # print(len(pipes))
-        # print(type(len(pipes.sprites())))
-        # if pipes.sprites().__len__() > 2:
-        # print("TEST")
-        # moving_x = pipes.sprites()[2].rect.x
-        # else:
-        # moving_x = pipes.sprites()[1].rect.x
-
-        # print(pipes.sprites()[1].is_passed())
-
-        # if moving_x < 0:
-        #    moving_x = pipes.sprites()[1].rect.x
-
-        # print(pipes.sprites())
-        # pygame.draw.circle(window, (255, 0, 0), (moving_x, y_bottom), 3)
-
-        # pygame.draw.circle(window, (255, 0, 0), (0,0), 100)
-        # pipes.sprites()[0].
-        # print("PIPE", pipes.sprites()[0].rect.x, pipes.sprites()[0].rect.y)
-
         clock.tick(60)
         pygame.display.update()
 
 
-def run_ai_window():
-    def are_alive(bird_list):
+def run_ai_window(genomes, config):
+    global gen
+    gen += 1
+
+    # start by creating lists holding the genome itself, the
+    # neural network associated with the genome and the
+    # bird object that uses that network to play
+
+    nets = []
+    birds = pygame.sprite.Group()
+    ge = []
+    for genome_id, genome in genomes:
+        genome.fitness = 0  # start with fitness level of 0
+        net = neat.nn.FeedForwardNetwork.create(genome, config)
+        nets.append(net)
+        birds.add(aiBird())
+        ge.append(genome)
+
+    def are_alive(birds):
         for bird in birds:
             if bird.alive:
                 return True
         return False
 
     global score
-
-    # Instantiate Bird
-    birds = pygame.sprite.Group()
-    birds.add(Bird())
 
     # Setup Pipes
     pipe_timer = 0
@@ -302,29 +316,26 @@ def run_ai_window():
         if are_alive(birds):
             pipes.update()
             ground.update()
-        birds.update(user_input)
 
         # Collision Detection
         for bird in birds:
             collision_pipes = pygame.sprite.spritecollide(bird, pipes, False)
             collision_ground = pygame.sprite.spritecollide(bird, ground, False)
 
-        # collision_pipes = pygame.sprite.spritecollide(birds.sprites()[0], pipes, False)
-        # collision_ground = pygame.sprite.spritecollide(birds.sprites()[0], ground, False)
+            if collision_pipes or collision_ground:
+                bird.alive = False
 
-        # print("COLLISION_PIPES", collision_pipes)
-        # print("COLLISION_GROUND", collision_ground)
+                ge[birds.sprites().index(bird)].fitness -= 1
+                nets.pop(birds.sprites().index(bird))
+                ge.pop(birds.sprites().index(bird))
 
-
-        if collision_pipes or collision_ground:
-            birds.sprites()[0].alive = False
-            if collision_ground:
-                # print("COLLISION GROUND")
-                window.blit(game_over_image, (SCREEN_WIDTH // 2 - game_over_image.get_width() // 2,
-                                              SCREEN_HEIGHT // 2 - game_over_image.get_height() // 2))
-                if user_input[pygame.K_r]:
-                    score = 0
-                    break
+                if collision_ground:
+                    # print("COLLISION GROUND")
+                    # window.blit(game_over_image, (SCREEN_WIDTH // 2 - game_over_image.get_width() // 2,
+                    #                              SCREEN_HEIGHT // 2 - game_over_image.get_height() // 2))
+                    if user_input[pygame.K_r]:
+                        score = 0
+                        menu()
 
         # Spawn Pipes
         if pipe_timer <= 0 and are_alive(birds):
@@ -342,13 +353,72 @@ def run_ai_window():
             pipes.remove(pipes.sprites()[0])
             pipes.remove(pipes.sprites()[0])
 
-        # type(pipes.sprites()[0])
-        # print("PASSED")
+        pipe_ind = 0
+        if are_alive(birds):
+            if len(pipes) > 1 and birds.sprites()[0].rect.x > pipes.sprites()[0].rect.x + pipes.sprites()[0].rect.width:
+                pipe_ind = 2
 
-        # pygame.draw.circle(window, (255, 0, 0), (pipes.sprites()[0].rect.x, pipes.sprites()[0].rect.y), 3)
+        for x, bird in enumerate(birds):  # give each bird a fitness of 0.1 for each frame it stays alive
+            ge[x].fitness += 0.1
+
+            # send bird location, top pipe location and bottom pipe location and determine from network whether to jump or not
+            #output = nets[birds.sprites().index(bird)].activate(
+            #    (bird.rect.y, abs(bird.rect.y - pipes.sprites()[pipe_ind + 1].rect.y),
+            #     abs(bird.rect.y - (pipes.sprites()[pipe_ind].rect.y + pipes.sprites()[pipe_ind].rect.height))))
+
+            output = nets[birds.sprites().index(bird)].activate(
+                (bird.rect.y, abs(bird.rect.y - pipes.sprites()[pipe_ind].rect.y + pipes.sprites()[pipe_ind].rect.height),
+                 abs(bird.rect.y - pipes.sprites()[pipe_ind + 1].rect.y)))
+
+            pygame.draw.circle(window, (255, 0, 0), (
+            pipes.sprites()[0].rect.x, pipes.sprites()[pipe_ind].rect.y + pipes.sprites()[pipe_ind].rect.height), 5)
+
+            #print("Y:", pipes.sprites()[0].rect.y + pipes.sprites()[0].rect.height)
+
+            if output[
+                0] > 0.5:  # we use a tanh activation function so result will be between -1 and 1. if over 0.5 jump
+                # print("OUTPUT", output[0])
+                birds.update(True)  # jump
+            else:
+                birds.update(False)  # don't jump
 
         clock.tick(60)
         pygame.display.update()
+
+
+def run(config_file):
+    """
+    runs the NEAT algorithm to train a neural network to play flappy bird.
+    :param config_file: location of config file
+    :return: None
+    """
+    config = neat.config.Config(neat.DefaultGenome, neat.DefaultReproduction,
+                                neat.DefaultSpeciesSet, neat.DefaultStagnation,
+                                config_file)
+
+    # Create the population, which is the top-level object for a NEAT run.
+    p = neat.Population(config)
+
+    # Add a stdout reporter to show progress in the terminal.
+    p.add_reporter(neat.StdOutReporter(True))
+    stats = neat.StatisticsReporter()
+    p.add_reporter(stats)
+    # p.add_reporter(neat.Checkpointer(5))
+
+    # Run for up to 50 generations.
+    winner = p.run(run_ai_window, 50)
+
+    # show final stats
+    print('\nBest genome:\n{!s}'.format(winner))
+
+
+if __name__ == '__main__':
+    # Determine path to configuration file. This path manipulation is
+    # here so that the script will run successfully regardless of the
+    # current working directory.
+    local_dir = os.path.dirname(__file__)
+    config_path = os.path.join(local_dir, 'config-feedforward.txt')
+    run(config_path)
 
 
 def menu():
@@ -372,6 +442,7 @@ def menu():
             run_ai_window()
 
         pygame.display.update()
+
 
 # Menu
 menu()
