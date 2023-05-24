@@ -1,5 +1,4 @@
 import os
-
 import pygame
 from sys import exit
 import random
@@ -169,15 +168,15 @@ def run_single_player_window():
         for line in file:
             print(line.strip().split('|'))
             try:
-                name, score = line.strip().split('|')
+                name, val = line.strip().split('|')
             except:
                 continue
-            score = int(score)
+            val = int(val)
 
             # Check if the current score is higher than the previous highest score
-            if score > max:
-                max = score
-                high_score = score
+            if val > max:
+                max = val
+                high_score = val
                 max_name = name
     print(max_name, max)
 
