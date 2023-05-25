@@ -3,7 +3,6 @@ import pygame
 from sys import exit
 import random
 
-
 pygame.init()
 clock = pygame.time.Clock()
 
@@ -14,9 +13,7 @@ FLOOR_HEIGHT = 520
 GRAVITY = 0.5
 SCROLL_SPEED = 2
 
-
 window = None
-
 
 # Images
 bird_images = [pygame.image.load("assets/bird_down.png"),
@@ -33,6 +30,9 @@ pygame.display.set_icon(bird_images[2])
 
 bird_start_position = (100, 250)
 score = 0
+global cur_name
+txt_score = 0
+txt_name = ''
 font = pygame.font.SysFont('bahnschrift', 25)
 game_stopped = True
 
@@ -86,17 +86,6 @@ class Pipe(pygame.sprite.Sprite):
         self.scroll_speed = scroll_speed
         self.top_left_x = 0
 
-    def get_x(self):
-        return self.top_left_x
-
-    def get_y(self):
-        return self.rect.y
-
-    def is_passed(self):
-        if self.passed:
-            return True
-        return False
-
     def update(self):
         # Move Pipe
         self.rect.x -= self.scroll_speed
@@ -137,6 +126,16 @@ def quit_game():
         if event.type == pygame.QUIT:
             with open('highscores.txt', 'a') as f:
                 f.write('\n')
+            name, found_score = get_highest_score("highscores.txt", cur_name)
+            global score
+            print('Your Score:', score)
+            if score > found_score:
+                print('New High Score!')
+            elif name == '' and found_score == 0:
+                print('No Previous High Scores Found!')
+            else:
+                print('Previous Best:', found_score, 'by', name)
+
             pygame.quit()
             exit()
 
@@ -158,27 +157,6 @@ def run_single_player_window():
     x_pos_ground, y_pos_ground = 0, FLOOR_HEIGHT
     ground = pygame.sprite.Group()
     ground.add(Ground(x_pos_ground, y_pos_ground, SCROLL_SPEED))
-
-    high_score = 0
-    with open('highscores.txt', 'r') as file:
-        max = 0
-        max_name = ''
-
-        # Iterate over each line in the file
-        for line in file:
-            print(line.strip().split('|'))
-            try:
-                name, val = line.strip().split('|')
-            except:
-                continue
-            val = int(val)
-
-            # Check if the current score is higher than the previous highest score
-            if val > max:
-                max = val
-                high_score = val
-                max_name = name
-    print(max_name, max)
 
     run = True
     while run:
@@ -279,14 +257,33 @@ def menu():
         pygame.display.update()
     pygame.quit()
 
+
 def start_game():
     username = input("Enter your name: ")
+    global cur_name
+    cur_name = username
     print("The game opened in new window.")
     with open("highscores.txt", "a") as f:
         f.write(username)
     menu()
 
 
+def get_highest_score(file_name, cur_name=''):
+    with open(file_name, 'r') as file:
+        file_score = 0
+        file_name = ''
+
+        for line in file:
+            try:
+                name, val = line.strip().split('|')
+            except:
+                continue
+            val = int(val)
+
+            if val > file_score and name != cur_name:
+                file_score = val
+                file_name = name
+    return file_name, file_score
+
 
 start_game()
-#menu()

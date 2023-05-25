@@ -1,7 +1,3 @@
-anthony|0
-anthony|1
-tony|3
-antos|4
-a|4
-tony|6
-a|4
+test|0
+tiv|8
+h|13
