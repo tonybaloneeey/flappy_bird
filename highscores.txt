@@ -1,3 +1,2 @@
-test|0
-tiv|8
-h|13
+heloo|1
+fadsf|4

@@ -30,7 +30,8 @@ pygame.display.set_icon(bird_images[2])
 
 bird_start_position = (100, 250)
 score = 0
-global cur_name
+written = False
+cur_name = ''
 txt_score = 0
 txt_name = ''
 font = pygame.font.SysFont('bahnschrift', 25)
@@ -143,7 +144,6 @@ def quit_game():
 # Game Main Method
 def run_single_player_window():
     global score
-    written = False
 
     # Instantiate Bird
     bird = pygame.sprite.GroupSingle()
@@ -198,19 +198,27 @@ def run_single_player_window():
 
         if collision_pipes or collision_ground:
             bird.sprite.alive = False
+            global written
+
             if not written:
-                written = True
                 with open('highscores.txt', 'a') as f:
                     f.write("|" + str(score))
+                written = True
+
+            max_user_score = get_cur_user_high_score('highscores.txt')
+
+            if score > max_user_score:
+                with open('highscores.txt', 'rb+') as f:
+                    f.seek(-2, os.SEEK_END)
+                    f.truncate()
+                    f.write(("|" + str(score)).encode())
+
             if collision_ground:
                 window.blit(game_over_image, (SCREEN_WIDTH // 2 - game_over_image.get_width() // 2,
                                               SCREEN_HEIGHT // 3 - game_over_image.get_height() // 3))
 
                 if user_input[pygame.K_r]:
                     score = 0
-                    with open('highscores.txt', 'rb+') as f:
-                        f.seek(-2, os.SEEK_END)
-                        f.truncate()
                     break
 
         # Spawn Pipes
@@ -284,6 +292,13 @@ def get_highest_score(file_name, cur_name=''):
                 file_score = val
                 file_name = name
     return file_name, file_score
+
+
+def get_cur_user_high_score(file_name):
+    max_user_score = 0
+    with open(file_name, 'r') as f:
+        max_user_score = int((f.read()[-1:]))
+    return max_user_score
 
 
 start_game()
