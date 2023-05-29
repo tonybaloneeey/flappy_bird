@@ -135,7 +135,7 @@ def quit_game():
             elif name == '' and found_score == 0:
                 print('No Previous High Scores Found!')
             else:
-                print('Previous Best:', found_score, 'by', name)
+                print('High Score:', found_score, 'by', name)
 
             pygame.quit()
             exit()
